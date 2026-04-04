@@ -21,6 +21,9 @@ class Settings(BaseModel):
         'www.railway.gov.tw',  # 台鐵新聞頁內容擷取不穩定，暫時排除
         'today.line.me',       # LINE TODAY 內容多為動態載入，擷取品質差
         'more-news.tw',        # 墨新聞需登入或反爬，暫時排除
+        'applealmond.com',     # 蘋果仁偏整理型內容，先排除
+        'tw.sports.yahoo.com', # Yahoo 體育結果容易混入非媽祖新聞
+        'www.msn.com',         # MSN 聚合內容較短，先排除
     ]
 
     # 大甲媽主題的搜尋詞，同時也作為二次篩選條件
@@ -29,6 +32,14 @@ class Settings(BaseModel):
         '大甲鎮瀾宮',
         '大甲媽祖',
         '大甲媽遶境',
+    ]
+
+    # 白沙屯媽祖主題的搜尋詞，同時也作為二次篩選條件
+    baishatun_terms: list[str] = [
+        '白沙屯媽',
+        '白沙屯媽祖',
+        '白沙屯拱天宮',
+        '白沙屯進香',
     ]
 
 

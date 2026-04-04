@@ -22,6 +22,13 @@ class NewsService:
             hours=hours,
         )
 
+    async def get_baishatun_news(self, hours: int) -> dict:
+        return await self._get_news(
+            topic="baishatun",
+            terms=settings.baishatun_terms,
+            hours=hours,
+        )
+
     # 先用搜尋詞抓 Google News RSS，再用同一組詞做二次篩選
     async def _get_news(self, topic: str, terms: list[str], hours: int) -> dict:
         limit = datetime.now(timezone.utc) - timedelta(hours=hours)

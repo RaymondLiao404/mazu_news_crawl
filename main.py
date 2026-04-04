@@ -19,6 +19,7 @@ def read_root() -> Response:
             "routes": [
                 "/",
                 f"/dajia_MAZU_news?hours={settings.default_hours}",
+                f"/baishatun_MAZU_news?hours={settings.default_hours}",
             ],
         }
     )
@@ -33,6 +34,18 @@ async def read_dajia_news(
     )
 ) -> Response:
     payload = await news_service.get_dajia_news(hours=hours)
+    return _json_utf8_response(payload)
+
+
+@app.get("/baishatun_MAZU_news")
+async def read_baishatun_news(
+    hours: int = Query(
+        default=settings.default_hours,
+        ge=0,
+        le=settings.max_hours,
+    )
+) -> Response:
+    payload = await news_service.get_baishatun_news(hours=hours)
     return _json_utf8_response(payload)
 
 
