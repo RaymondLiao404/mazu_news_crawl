@@ -1,4 +1,7 @@
-﻿from fastapi import FastAPI, Query
+import json
+
+from fastapi import FastAPI, Query
+from fastapi.responses import Response
 
 from config.settings import settings
 from services.news_service import NewsService
@@ -9,14 +12,17 @@ news_service = NewsService()
 
 
 @app.get("/")
-def read_root() -> dict:
-    return {
-        "message": "News API is running",
-        "routes": [
-            "/",
-            f"/dajia_MAZU_news?hours={settings.default_hours}",
-        ],
-    }
+def read_root() -> Response:
+    return _json_utf8_response(
+        {
+            "message": "News API is running",
+            "routes": [
+                "/",
+                f"/dajia_MAZU_news?hours={settings.default_hours}",
+            ],
+        }
+    )
+
 
 @app.get("/dajia_MAZU_news")
 async def read_dajia_news(
@@ -25,5 +31,13 @@ async def read_dajia_news(
         ge=0,
         le=settings.max_hours,
     )
-) -> dict:
-    return await news_service.get_dajia_news(hours=hours)
+) -> Response:
+    payload = await news_service.get_dajia_news(hours=hours)
+    return _json_utf8_response(payload)
+
+
+def _json_utf8_response(payload: dict) -> Response:
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False),
+        media_type="application/json; charset=utf-8",
+    )
