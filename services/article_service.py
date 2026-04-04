@@ -109,9 +109,7 @@ class ArticleService:
 
         if response is not None:
             final_url = response.url
-            if response.apparent_encoding:
-                response.encoding = response.apparent_encoding
-            html = response.text
+            html = self._decode_response_text(response)
 
             if response.status_code >= 400 or self._looks_blocked(html):
                 browser_html = self._fetch_html_via_playwright(url)
@@ -134,6 +132,18 @@ class ArticleService:
 
         content = self._join_lines(lines)
         return content or fallback_text
+
+    def _decode_response_text(self, response: requests.Response) -> str:
+        domain = urlparse(response.url).netloc.lower()
+
+        if "yahoo.com" in domain:
+            text = response.content.decode("utf-8", errors="replace")
+        else:
+            if response.apparent_encoding:
+                response.encoding = response.apparent_encoding
+            text = response.text
+
+        return self._fix_mojibake(text)
 
     # 被反爬擋住時，用真瀏覽器渲染頁面再取 HTML
     def _fetch_html_via_playwright(self, url: str) -> str:
@@ -410,3 +420,18 @@ class ArticleService:
 
     def _join_lines(self, lines: list[str]) -> str:
         return "\n".join(lines)
+
+    def _fix_mojibake(self, text: str) -> str:
+        mojibake_markers = ("å", "ä", "é", "è", "ï", "ç", "æ")
+        if not text or not any(marker in text for marker in mojibake_markers):
+            return text
+
+        try:
+            repaired = text.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return text
+
+        if repaired.count("\ufffd") > text.count("\ufffd"):
+            return text
+
+        return repaired
