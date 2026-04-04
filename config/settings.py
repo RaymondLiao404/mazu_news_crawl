@@ -24,6 +24,8 @@ class Settings(BaseModel):
         'applealmond.com',     # 蘋果仁偏整理型內容，先排除
         'tw.sports.yahoo.com', # Yahoo 體育結果容易混入非媽祖新聞
         'www.msn.com',         # MSN 聚合內容較短，先排除
+        'news.pchome.com.tw',  # PChome 新聞聚合內容先排除
+        'www.thenewslens.com', # 關鍵評論網長篇選摘內容先排除
     ]
 
     # 大甲媽主題的搜尋詞，同時也作為二次篩選條件
