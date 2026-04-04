@@ -3,3 +3,5 @@ uvicorn
 feedparser
 beautifulsoup4
 requests
+yt-dlp
+imageio-ffmpeg

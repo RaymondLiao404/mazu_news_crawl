@@ -1,14 +1,16 @@
 import json
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 
 from config.settings import settings
 from services.news_service import NewsService
+from services.yt_snapshot_service import YtSnapshotService
 
 
 app = FastAPI(title="News API", version="1.0.0")
 news_service = NewsService()
+yt_snapshot_service = YtSnapshotService()
 
 
 @app.get("/")
@@ -20,6 +22,7 @@ def read_root() -> Response:
                 "/",
                 f"/dajia_MAZU_news?hours={settings.default_hours}",
                 f"/baishatun_MAZU_news?hours={settings.default_hours}",
+                "/yt_live_snapshot?url=<youtube_url>",
             ],
         }
     )
@@ -47,6 +50,17 @@ async def read_baishatun_news(
 ) -> Response:
     payload = await news_service.get_baishatun_news(hours=hours)
     return _json_utf8_response(payload)
+
+
+@app.get("/yt_live_snapshot")
+def get_yt_live_snapshot(
+    url: str = Query(..., description="YouTube 直播或影片網址"),
+) -> Response:
+    try:
+        image_bytes = yt_snapshot_service.capture_snapshot_bytes(url)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(content=image_bytes, media_type="image/jpeg")
 
 
 def _json_utf8_response(payload: dict) -> Response:
