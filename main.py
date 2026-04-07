@@ -1,15 +1,18 @@
+import asyncio
 import json
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 
 from config.settings import settings
+from services.baishatun_location_service import BaishatunLocationService
 from services.news_service import NewsService
 from services.yt_snapshot_service import YtSnapshotService
 
 
 app = FastAPI(title="News API", version="1.0.0")
 news_service = NewsService()
+baishatun_location_service = BaishatunLocationService()
 yt_snapshot_service = YtSnapshotService()
 
 
@@ -48,13 +51,25 @@ async def read_baishatun_news(
         le=settings.max_hours,
     )
 ) -> Response:
+    # 這支路由會在新聞資料中插入白沙屯第三方位置欄位。
     payload = await news_service.get_baishatun_news(hours=hours)
-    return _json_utf8_response(payload)
+    location_fields = await asyncio.to_thread(
+        baishatun_location_service.fetch_location_fields
+    )
+
+    response_payload = {
+        "topic": payload["topic"],
+        "hours": payload["hours"],
+        "count": payload["count"],
+        **location_fields,
+        "items": payload["items"],
+    }
+    return _json_utf8_response(response_payload)
 
 
 @app.get("/yt_live_snapshot")
 def get_yt_live_snapshot(
-    url: str = Query(..., description="YouTube 直播或影片網址"),
+    url: str = Query(..., description="YouTube 影片網址"),
 ) -> Response:
     try:
         image_bytes = yt_snapshot_service.capture_snapshot_bytes(url)

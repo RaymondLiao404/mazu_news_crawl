@@ -10,11 +10,11 @@ from services.article_service import ArticleService
 
 
 class NewsService:
-    # 提供新聞查詢服務，使用 Google News RSS 作為來源
+    # 只負責新聞資料整理，不處理第三方位置資料。
     def __init__(self) -> None:
         self.article_service = ArticleService()
 
-    # 取得大甲媽新聞
+    # 取得大甲媽相關新聞。
     async def get_dajia_news(self, hours: int) -> dict:
         return await self._get_news(
             topic="dajia",
@@ -22,6 +22,7 @@ class NewsService:
             hours=hours,
         )
 
+    # 取得白沙屯相關新聞；位置資料由路由層決定是否額外合併。
     async def get_baishatun_news(self, hours: int) -> dict:
         return await self._get_news(
             topic="baishatun",
@@ -29,7 +30,7 @@ class NewsService:
             hours=hours,
         )
 
-    # 先用搜尋詞抓 Google News RSS，再用同一組詞做二次篩選
+    # 先抓 Google News RSS，再整理成 API 需要的新聞資料格式。
     async def _get_news(self, topic: str, terms: list[str], hours: int) -> dict:
         limit = datetime.now(timezone.utc) - timedelta(hours=hours)
         seen_titles: set[str] = set()
@@ -55,7 +56,7 @@ class NewsService:
 
                 fallback_text = self._extract_summary_text(entry)
 
-                # 先用標題與摘要做二次篩選，避免無關新聞混入
+                # 標題與摘要都不符合主題關鍵詞時，直接略過。
                 if not self._matches_terms(title=title, summary=fallback_text, terms=terms):
                     continue
 
@@ -77,7 +78,7 @@ class NewsService:
         items.sort(key=lambda item: item["published_at"], reverse=True)
         return {"topic": topic, "hours": hours, "count": len(items), "items": items}
 
-    # RSS 來源先並行抓，避免多組關鍵字逐一等待
+    # 平行抓取多組 RSS，降低整體等待時間。
     async def _fetch_feeds(self, terms: list[str]) -> list:
         tasks = [
             asyncio.to_thread(feedparser.parse, self._build_rss_url(term))
@@ -85,7 +86,7 @@ class NewsService:
         ]
         return await asyncio.gather(*tasks, return_exceptions=False)
 
-    # 將候選文章並行處理，避免單篇延遲拖慢整體
+    # 平行處理候選新聞，並限制同時抓文數量。
     async def _resolve_candidates(self, candidates: list[dict]) -> list[dict]:
         semaphore = asyncio.Semaphore(settings.fetch_concurrency)
         tasks = [
@@ -95,7 +96,7 @@ class NewsService:
         results = await asyncio.gather(*tasks)
         return [item for item in results if item is not None]
 
-    # 單篇文章解析流程：解 Google 連結、排除站台、抓正文
+    # 解析 Google News 轉址後的原文網址，並抓取新聞正文。
     async def _resolve_candidate(self, candidate: dict, semaphore: asyncio.Semaphore) -> dict | None:
         async with semaphore:
             source_url = await asyncio.to_thread(
@@ -121,7 +122,7 @@ class NewsService:
                 "content": content,
             }
 
-    # 從 RSS entry 取來源網域（若能取得，先用它做排除）
+    # 從 RSS entry 的 source 欄位取出來源網域，用來做網站排除。
     def _get_entry_source_domain(self, entry) -> str:
         source = getattr(entry, "source", None) or entry.get("source")
         if isinstance(source, dict):
@@ -130,7 +131,7 @@ class NewsService:
             href = getattr(source, "href", "") or getattr(source, "url", "")
         return urlparse(href).netloc.lower() if href else ""
 
-    # 建立 Google News RSS 查詢網址
+    # 組出 Google News RSS 查詢網址。
     def _build_rss_url(self, query: str) -> str:
         encoded_query = quote(query)
         return (
@@ -138,7 +139,7 @@ class NewsService:
             "&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         )
 
-    # 從 RSS 摘要欄位取出純文字，作為二次篩選與備援內文
+    # 將 RSS 內的 HTML 摘要轉成純文字，供後續關鍵詞判斷與正文備援使用。
     def _extract_summary_text(self, entry) -> str:
         candidates: list[str] = []
 
@@ -178,7 +179,7 @@ class NewsService:
         title = getattr(entry, "title", "")
         return title.strip() if title else ""
 
-    # 使用同一組搜尋詞驗證標題或摘要，避免混入無關新聞
+    # 標題或摘要只要命中任一關鍵詞，就保留這篇新聞。
     def _matches_terms(self, title: str, summary: str, terms: list[str]) -> bool:
         target = f"{title}\n{summary}"
         return any(term in target for term in terms)
