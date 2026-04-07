@@ -6,6 +6,7 @@ from fastapi.responses import Response
 
 from config.settings import settings
 from services.baishatun_location_service import BaishatunLocationService
+from services.dajia_location_service import DajiaLocationService
 from services.news_service import NewsService
 from services.yt_snapshot_service import YtSnapshotService
 
@@ -13,6 +14,7 @@ from services.yt_snapshot_service import YtSnapshotService
 app = FastAPI(title="News API", version="1.0.0")
 news_service = NewsService()
 baishatun_location_service = BaishatunLocationService()
+dajia_location_service = DajiaLocationService()
 yt_snapshot_service = YtSnapshotService()
 
 
@@ -40,7 +42,16 @@ async def read_dajia_news(
     )
 ) -> Response:
     payload = await news_service.get_dajia_news(hours=hours)
-    return _json_utf8_response(payload)
+    location_fields = dajia_location_service.fetch_location_fields()
+
+    response_payload = {
+        "topic": payload["topic"],
+        "hours": payload["hours"],
+        "count": payload["count"],
+        **location_fields,
+        "items": payload["items"],
+    }
+    return _json_utf8_response(response_payload)
 
 
 @app.get("/baishatun_MAZU_news")

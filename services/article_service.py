@@ -134,16 +134,70 @@ class ArticleService:
         return content or fallback_text
 
     def _decode_response_text(self, response: requests.Response) -> str:
-        domain = urlparse(response.url).netloc.lower()
+        raw_bytes = response.content
+        candidate_encodings: list[str] = []
 
-        if "yahoo.com" in domain:
-            text = response.content.decode("utf-8", errors="replace")
-        else:
-            if response.apparent_encoding:
-                response.encoding = response.apparent_encoding
-            text = response.text
+        for encoding in (
+            response.encoding,
+            response.apparent_encoding,
+            "utf-8",
+            "utf-8-sig",
+            "big5",
+            "cp950",
+        ):
+            normalized = (encoding or "").strip().lower()
+            if normalized and normalized not in candidate_encodings:
+                candidate_encodings.append(normalized)
 
-        return self._fix_mojibake(text)
+        best_text = ""
+        best_score = float("-inf")
+
+        for encoding in candidate_encodings:
+            try:
+                decoded_text = raw_bytes.decode(encoding, errors="replace")
+            except LookupError:
+                continue
+
+            repaired_text = self._fix_mojibake(decoded_text)
+            score = self._score_decoded_text(repaired_text)
+            if score > best_score:
+                best_score = score
+                best_text = repaired_text
+
+        if best_text:
+            return best_text
+
+        return raw_bytes.decode("utf-8", errors="replace")
+
+    def _score_decoded_text(self, text: str) -> float:
+        if not text:
+            return float("-inf")
+
+        cjk_count = len(re.findall(r"[\u4e00-\u9fff]", text))
+        replacement_count = text.count("\ufffd")
+        mojibake_count = sum(
+            text.count(marker)
+            for marker in (
+                "\u00c3",
+                "\u00c2",
+                "\u00c5",
+                "\u00c4",
+                "\u00c9",
+                "\u00c8",
+                "\u00c7",
+                "\u00c6",
+                "\u00cf",
+                "\u00e5",
+                "\u00e4",
+                "\u00e9",
+                "\u00e8",
+                "\u00e7",
+                "\u00e6",
+                "\u00ef",
+            )
+        )
+
+        return (cjk_count * 3) - (replacement_count * 5) - (mojibake_count * 4)
 
     # 被反爬擋住時，用真瀏覽器渲染頁面再取 HTML
     def _fetch_html_via_playwright(self, url: str) -> str:
@@ -422,7 +476,25 @@ class ArticleService:
         return "\n".join(lines)
 
     def _fix_mojibake(self, text: str) -> str:
-        mojibake_markers = ("å", "ä", "é", "è", "ï", "ç", "æ")
+        # 常見 UTF-8 被誤當成 Latin-1 / cp1252 解碼後，會出現這類字元。
+        mojibake_markers = (
+            "\u00c3",
+            "\u00c2",
+            "\u00c5",
+            "\u00c4",
+            "\u00c9",
+            "\u00c8",
+            "\u00c7",
+            "\u00c6",
+            "\u00cf",
+            "\u00e5",
+            "\u00e4",
+            "\u00e9",
+            "\u00e8",
+            "\u00e7",
+            "\u00e6",
+            "\u00ef",
+        )
         if not text or not any(marker in text for marker in mojibake_markers):
             return text
 
