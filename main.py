@@ -61,9 +61,7 @@ async def read_dajia_news(
         "topic": payload["topic"],
         "hours": payload["hours"],
         "count": payload["count"],
-        "system_time": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "system_time_timezone": "Asia/Taipei",
-        "system_time_utc_offset": "UTC+8",
+        "system_time": f"UTC+8 {now.strftime('%Y-%m-%d %H:%M:%S')}",
         **location_fields,
         "items": payload["items"],
     }
@@ -88,9 +86,7 @@ async def read_baishatun_news(
         "topic": payload["topic"],
         "hours": payload["hours"],
         "count": payload["count"],
-        "system_time": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "system_time_timezone": "Asia/Taipei",
-        "system_time_utc_offset": "UTC+8",
+        "system_time": f"UTC+8 {now.strftime('%Y-%m-%d %H:%M:%S')}",
         **location_fields,
         "items": payload["items"],
     }
