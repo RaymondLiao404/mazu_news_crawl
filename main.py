@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
@@ -20,6 +21,7 @@ news_service = NewsService()
 baishatun_location_service = BaishatunLocationService()
 dajia_location_service = DajiaLocationService()
 yt_snapshot_service = YtSnapshotService()
+taiwan_timezone = timezone(timedelta(hours=8))
 
 
 @app.get("/")
@@ -40,8 +42,6 @@ def read_root() -> Response:
 
 @app.get("/favicon.ico")
 def favicon() -> Response:
-    # 瀏覽器載入頁面時通常會自動請求 favicon。
-    # 這裡回傳 204，避免沒有圖示檔時在 log 裡持續出現 404。
     return Response(status_code=204)
 
 
@@ -55,11 +55,15 @@ async def read_dajia_news(
 ) -> Response:
     payload = await news_service.get_dajia_news(hours=hours)
     location_fields = dajia_location_service.fetch_location_fields()
+    now = datetime.now(taiwan_timezone)
 
     response_payload = {
         "topic": payload["topic"],
         "hours": payload["hours"],
         "count": payload["count"],
+        "system_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "system_time_timezone": "Asia/Taipei",
+        "system_time_utc_offset": "UTC+8",
         **location_fields,
         "items": payload["items"],
     }
@@ -74,16 +78,19 @@ async def read_baishatun_news(
         le=settings.max_hours,
     )
 ) -> Response:
-    # 先抓白沙屯媽祖相關新聞，再把目前位置資訊一併放進 JSON 回應。
     payload = await news_service.get_baishatun_news(hours=hours)
     location_fields = await asyncio.to_thread(
         baishatun_location_service.fetch_location_fields
     )
+    now = datetime.now(taiwan_timezone)
 
     response_payload = {
         "topic": payload["topic"],
         "hours": payload["hours"],
         "count": payload["count"],
+        "system_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "system_time_timezone": "Asia/Taipei",
+        "system_time_utc_offset": "UTC+8",
         **location_fields,
         "items": payload["items"],
     }
@@ -92,8 +99,6 @@ async def read_baishatun_news(
 
 @app.get("/baishatun_MAZU_location")
 def read_baishatun_location() -> Response:
-    # 提供白沙屯媽祖目前位置的純文字 API。
-    # 回傳內容是固定的三行文字格式，方便直接顯示或貼到通訊軟體。
     location_fields = baishatun_location_service.fetch_location_fields()
     location_text = build_baishatun_mazu_location_text(location_fields)
     return create_baishatun_location_text_response(location_text)
@@ -111,7 +116,6 @@ def get_yt_live_snapshot(
 
 
 def _create_json_response(payload: dict) -> Response:
-    # 建立 UTF-8 JSON 回應，避免中文內容被轉碼成不易閱讀的格式。
     return Response(
         content=json.dumps(payload, ensure_ascii=False),
         media_type="application/json; charset=utf-8",
