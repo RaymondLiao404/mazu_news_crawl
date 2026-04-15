@@ -11,8 +11,9 @@ from services.dajia_location_service import DajiaLocationService
 from services.news_service import NewsService
 from services.yt_snapshot_service import YtSnapshotService
 from utils.baishatun_location_response import (
+    build_dajia_mazu_location_text,
     build_baishatun_mazu_location_text,
-    create_baishatun_location_text_response,
+    create_location_text_response,
 )
 
 
@@ -32,6 +33,7 @@ def read_root() -> Response:
             "routes": [
                 "/",
                 f"/dajia_MAZU_news?hours={settings.default_hours}",
+                "/dajia_MAZU_location",
                 f"/baishatun_MAZU_news?hours={settings.default_hours}",
                 "/baishatun_MAZU_location",
                 "/yt_live_snapshot?url=<youtube_url>",
@@ -68,6 +70,16 @@ async def read_dajia_news(
     return _create_json_response(response_payload)
 
 
+@app.get("/dajia_MAZU_location")
+def read_dajia_location(payload: str | None = None) -> Response:
+    location_fields = dajia_location_service.fetch_location_fields()
+    if payload is not None:
+        return _create_json_response(location_fields)
+
+    location_text = build_dajia_mazu_location_text(location_fields)
+    return create_location_text_response(location_text)
+
+
 @app.get("/baishatun_MAZU_news")
 async def read_baishatun_news(
     hours: int = Query(
@@ -94,10 +106,13 @@ async def read_baishatun_news(
 
 
 @app.get("/baishatun_MAZU_location")
-def read_baishatun_location() -> Response:
+def read_baishatun_location(payload: str | None = None) -> Response:
     location_fields = baishatun_location_service.fetch_location_fields()
+    if payload is not None:
+        return _create_json_response(location_fields)
+
     location_text = build_baishatun_mazu_location_text(location_fields)
-    return create_baishatun_location_text_response(location_text)
+    return create_location_text_response(location_text)
 
 
 @app.get("/yt_live_snapshot")
